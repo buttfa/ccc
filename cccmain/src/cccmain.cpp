@@ -17,8 +17,17 @@ int main(int argc, char* argv[]) {
 
     // Run the target command
     if (ccc::cmds.find(target_cmd) != ccc::cmds.end()) {
-        ccc::cmds[target_cmd]->run(args);
-        return 0;
+        try {
+            ccc::cmds[target_cmd]->run(args);
+            return 0;                       // Normal execution returns 0
+        } catch (const std::exception& e) { // Catch standard exceptions
+            std::cerr << "Command execution failed: " << e.what() << std::endl;
+            return 1;
+        } catch (...) { // Catch other unknown anomalies
+            std::cerr << "Command execution failed due to unknown exception"
+                      << std::endl;
+            return 1;
+        }
     }
 
     std::cout << "Unknown command: " << target_cmd << std::endl;
