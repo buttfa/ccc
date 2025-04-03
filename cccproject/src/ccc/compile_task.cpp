@@ -108,16 +108,56 @@ void ccc::compile_task::compile_source_file(const ccc::config& project_cfg,
 }
 
 void ccc::compile_task::add_source_file(const std::string& file_path) {
+    this->source_files.push_back(file_path);
     return;
 }
 
 void ccc::compile_task::add_source_files(
     const std::initializer_list<std::string>& file_paths) {
+    for (auto file_path : file_paths) {
+        this->source_files.push_back(file_path);
+    }
     return;
 }
 
 void ccc::compile_task::add_source_files(
     const std::initializer_list<std::string>& dir_paths,
     const std::initializer_list<std::string>& suffixs, bool recursive) {
+    namespace fs = std::filesystem;
+    static std::mutex mtx;
+    std::vector<std::string> suffix_vector(suffixs);
+    for (const auto& dir : dir_paths) {
+        const fs::path dir_path(dir);
+        if (!fs::exists(dir_path))
+            continue;
+        if (!fs::is_directory(dir_path))
+            continue;
+        std::vector<fs::directory_entry> entries;
+        if (recursive) {
+            for (const auto& entry :
+                 fs::recursive_directory_iterator(dir_path)) {
+                entries.emplace_back(entry);
+            }
+        } else {
+            for (const auto& entry : fs::directory_iterator(dir_path)) {
+                entries.emplace_back(entry);
+            }
+        }
+        for (const auto& entry : entries) {
+            if (!entry.is_regular_file() || entry.is_symlink())
+                continue;
+            const std::string ext = entry.path().extension().string();
+            if (!ext.empty()) {
+                for (const auto& suffix : suffix_vector) {
+                    if (ext == suffix) {
+                        std::lock_guard<std::mutex> lock(mtx);
+                        source_files.emplace_back(
+                            entry.path().lexically_normal().string());
+                        break;
+                    }
+                }
+            }
+        }
+    }
     return;
 }
